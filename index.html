@@ -60,32 +60,6 @@
             background-color: #f0fdf4;
         }
     </style>
-
-    <!-- FIREBASE CLOUD DATABASE SDK (FIXED IMPORTS) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, orderBy, onSnapshot, deleteDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        try {
-            const firebaseConfig = {
-                apiKey: "AIzaSyDq8LF9N8SwsNm3d8bEq9Nqy_GLR5d3bVM",
-                authDomain: "perpus-presensi.firebaseapp.com",
-                projectId: "perpus-presensi",
-                storageBucket: "perpus-presensi.firebasestorage.app",
-                messagingSenderId: "438175168569",
-                appId: "1:438175168569:web:9de4532bcB3bac1ffb35e8",
-                measurementId: "G-BB3L66WJ1W"
-            };
-
-            const app = initializeApp(firebaseConfig);
-            const db = getFirestore(app);
-
-            window.db = db;
-            window.dbRefs = { collection, addDoc, doc, setDoc, getDoc, query, orderBy, onSnapshot, deleteDoc, writeBatch, getDocs };
-        } catch(err) {
-            console.warn("Firebase tidak terkonfigurasi dengan benar, fallback ke LocalStorage:", err);
-        }
-    </script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
 
@@ -727,21 +701,11 @@
 
         let appSettings = { ...defaultSettings };
         let isAdminLoggedIn = false;
-
-        // Demo Initial Sample Data
-        const sampleData = [
-            { id: "LOG-101", visitorId: "2026101", name: "Andi Pratama", category: "Siswa", unit: "XII IPA 1", purpose: "Membaca Buku", timestamp: "2026-08-17T08:15:00" },
-            { id: "LOG-102", visitorId: "2026102", name: "Siti Rahmawati", category: "Siswa", unit: "XI IPS 2", purpose: "Pinjam / Kembali Buku", timestamp: "2026-08-17T08:45:00" },
-            { id: "LOG-103", visitorId: "19850312", name: "Drs. Bambang Haryono", category: "Guru", unit: "Guru Bahasa Indonesia", purpose: "Belajar Kelompok", timestamp: "2026-08-17T09:10:00" },
-            { id: "LOG-104", visitorId: "2026103", name: "Dewi Anggraini", category: "Siswa", unit: "X IPA 1", purpose: "Akses Komputer & Internet", timestamp: "2026-08-17T09:30:00" },
-            { id: "LOG-105", visitorId: "99001122", name: "Irwan Setiawan", category: "Tamu", unit: "Pengawas Dinas", purpose: "Lainnya", timestamp: "2026-08-17T10:05:00" }
-        ];
-
         let attendanceList = [];
         let categoryChartInstance = null;
         let purposeChartInstance = null;
 
-        // FUNGSI JAM DIGITAL REALTIME MANDIRI
+        // FUNGSI JAM DIGITAL REALTIME
         function startLiveClock() {
             function updateClock() {
                 const liveClockElem = document.getElementById('liveClock');
@@ -762,18 +726,12 @@
             setInterval(updateClock, 1000);
         }
 
-        // Dijalankan saat DOM siap
-	document.addEventListener('DOMContentLoaded', async function() {
-            if (typeof startLiveClock === "function") startLiveClock();
-            if (typeof loadSettings === "function") loadSettings();
-            
-            // Menggunakan await agar tabel menunggu data dari internet selesai diunduh
-            await loadAttendanceData();
-            
-            if (typeof setDefaultDates === "function") setDefaultDates();
-            if (typeof applySettingsToUI === "function") applySettingsToUI();
-            if (typeof toggleUnitField === "function") toggleUnitField();
-            if (typeof updateAllViews === "function") updateAllViews();
+        document.addEventListener('DOMContentLoaded', function() {
+            startLiveClock();
+            loadSettings();
+            setDefaultDates();
+            applySettingsToUI();
+            toggleUnitField();
         });
 
         function loadSettings() {
@@ -801,7 +759,6 @@
             document.getElementById('headerAppTitle').innerText = appSettings.libName;
             document.getElementById('headerSchoolInfo').innerText = appSettings.schoolName + " • " + appSettings.schoolAddress;
 
-            // Render Header Logo
             const logoContainer = document.getElementById('headerLogoContainer');
             if (appSettings.schoolLogo) {
                 logoContainer.innerHTML = `<img src="${appSettings.schoolLogo}" alt="Logo" class="h-10 w-auto max-w-[50px] object-contain">`;
@@ -809,7 +766,6 @@
                 logoContainer.innerHTML = `<i class="fa-solid fa-book-open-reader text-2xl text-emerald-300"></i>`;
             }
 
-            // Form Pengaturan values
             document.getElementById('settingAdminUsername').value = appSettings.adminUsername || 'admin';
             document.getElementById('settingAdminPassword').value = appSettings.adminPassword || 'admin123';
             document.getElementById('settingLibName').value = appSettings.libName;
@@ -828,7 +784,7 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            if (file.size > 2 * 1024 * 1024) { // Max 2MB limit
+            if (file.size > 2 * 1024 * 1024) {
                 showToast('Ukuran berkas gambar maksimal 2MB!', 'warning');
                 return;
             }
@@ -908,7 +864,7 @@
                     <input type="text" id="visitorUnit" required placeholder="Contoh: Staf TU / Admin Perpustakaan" 
                            class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm">
                 `;
-            } else { // Tamu
+            } else {
                 label.innerHTML = 'Instansi / Asal Tamu <span class="text-red-500">*</span>';
                 wrapper.innerHTML = `
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
@@ -920,30 +876,6 @@
             }
         }
 
- // Memuat data dari Cloud Firebase secara otomatis
-async function loadAttendanceData() {
-    console.log("Memuat data dari Cloud Firebase...");
-    if (typeof window.muatRiwayatDariFirebaseGlobal === "function") {
-        await window.muatRiwayatDariFirebaseGlobal();
-    } else {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        attendanceList = stored ? JSON.parse(stored) : [...sampleData];
-        if (typeof renderTable === "function") renderTable();
-    }
-}
-
-// Menyimpan data baru ke Cloud Firebase
-async function saveAttendanceData() {
-    // Tetap simpan di lokal browser sebagai cadangan offline
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(attendanceList));
-
-    if (typeof window.simpanPresensiKeFirebaseGlobal === "function") {
-        const dataTerbaru = attendanceList[attendanceList.length - 1];
-        if (dataTerbaru) {
-            await window.simpanPresensiKeFirebaseGlobal(dataTerbaru);
-        }
-    }
-}
         function setDefaultDates() {
             const todayStr = new Date().toISOString().split('T')[0];
             document.getElementById('rekapStartDate').value = todayStr;
@@ -1009,7 +941,7 @@ async function saveAttendanceData() {
             }
         }
 
-        function handleCheckIn(event) {
+        async function handleCheckIn(event) {
             event.preventDefault();
             
             const visitorId = document.getElementById('visitorId').value.trim();
@@ -1027,7 +959,6 @@ async function saveAttendanceData() {
             }
 
             const newLog = {
-                id: 'LOG-' + Date.now(),
                 visitorId,
                 name,
                 category,
@@ -1036,11 +967,11 @@ async function saveAttendanceData() {
                 timestamp: new Date().toISOString()
             };
 
-            attendanceList.unshift(newLog);
-            saveAttendanceData();
-            updateAllViews();
-            resetCheckinForm();
+            if (typeof window.simpanPresensiKeFirebaseGlobal === "function") {
+                await window.simpanPresensiKeFirebaseGlobal(newLog);
+            }
 
+            resetCheckinForm();
             showToast(`Presensi berhasil dicatat! Selamat datang, ${name}.`, 'success');
         }
 
@@ -1162,15 +1093,15 @@ async function saveAttendanceData() {
             document.getElementById('tableInfo').innerText = `Menampilkan ${filtered.length} dari ${attendanceList.length} data`;
         }
 
-        function deleteVisitor(id) {
+        async function deleteVisitor(id) {
             openModal(
                 "Hapus Log Kunjungan",
                 "Apakah Anda yakin ingin menghapus data kunjungan ini?",
-                () => {
-                    attendanceList = attendanceList.filter(item => item.id !== id);
-                    saveAttendanceData();
-                    updateAllViews();
-                    showToast('Data berhasil dihapus.', 'info');
+                async () => {
+                    if (typeof window.hapusDataFirebaseGlobal === "function") {
+                        await window.hapusDataFirebaseGlobal(id);
+                        showToast('Data berhasil dihapus dari Cloud.', 'info');
+                    }
                 }
             );
         }
@@ -1271,10 +1202,7 @@ async function saveAttendanceData() {
                 "Hapus Seluruh Data",
                 "PERINGATAN: Seluruh riwayat presensi kunjungan perpustakaan akan dihapus permanen. Lanjutkan?",
                 () => {
-                    attendanceList = [];
-                    saveAttendanceData();
-                    updateAllViews();
-                    showToast('Semua data presensi telah dibersihkan.', 'info');
+                    showToast('Silakan hapus langsung dari konsol Firebase untuk keamanan.', 'warning');
                 }
             );
         }
@@ -1407,7 +1335,6 @@ async function saveAttendanceData() {
                 return;
             }
 
-            // KOP SURAT LOGO (Jika Ada)
             if (appSettings.schoolLogo) {
                 try {
                     doc.addImage(appSettings.schoolLogo, 15, 11, 18, 18);
@@ -1416,7 +1343,6 @@ async function saveAttendanceData() {
                 }
             }
 
-            // KOP SURAT HEADER TEXT
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
             doc.text(appSettings.schoolName.toUpperCase(), 105, 15, { align: 'center' });
@@ -1430,14 +1356,12 @@ async function saveAttendanceData() {
             doc.setTextColor(100);
             doc.text(appSettings.schoolAddress, 105, 26, { align: 'center' });
 
-            // Line Separator
             doc.setLineWidth(0.8);
             doc.setDrawColor(30);
             doc.line(15, 29, 195, 29);
             doc.setLineWidth(0.2);
             doc.line(15, 30, 195, 30);
 
-            // LAPORAN TITLE
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(0);
@@ -1448,22 +1372,19 @@ async function saveAttendanceData() {
             const periodText = `Periode: ${startDate || 'Awal'} s/d ${endDate || 'Hari Ini'}  |  Kategori: ${categoryFilter}`;
             doc.text(periodText, 105, 42, { align: 'center' });
 
-            // SUMMARY TABLE
             const totalVisits = filtered.length;
             const siswaVisits = filtered.filter(i => i.category === 'Siswa').length;
             const guruVisits = filtered.filter(i => i.category === 'Guru' || i.category === 'Staf').length;
-            const tamuVisits = filtered.filter(i => i.category === 'Tamu').length;
 
             doc.autoTable({
                 startY: 46,
-                head: [['Total Kunjungan', 'Pengunjung Siswa', 'Guru & Staf', 'Tamu Luar']],
-                body: [[totalVisits.toString(), siswaVisits.toString(), guruVisits.toString(), tamuVisits.toString()]],
+                head: [['Total Kunjungan', 'Pengunjung Siswa', 'Guru & Staf']],
+                body: [[totalVisits.toString(), siswaVisits.toString(), guruVisits.toString()]],
                 theme: 'grid',
                 styles: { fontSize: 8, alignment: 'center', cellPadding: 2 },
                 headStyles: { fillColor: [22, 163, 74], textColor: 255 }
             });
 
-            // MAIN VISITOR LOGS TABLE
             const tableRows = filtered.map((item, index) => {
                 const dateObj = new Date(item.timestamp);
                 const formattedDate = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -1498,7 +1419,6 @@ async function saveAttendanceData() {
                 }
             });
 
-            // DUAL SIGNATURE BLOCK
             let finalY = doc.lastAutoTable.finalY + 12;
 
             if (finalY > 230) {
@@ -1513,7 +1433,6 @@ async function saveAttendanceData() {
 
             doc.text(`Mengetahui, ${todayFormatted}`, 145, finalY);
 
-            // Left Side: Kepala Sekolah
             doc.text("Kepala Sekolah", 25, finalY + 6);
             doc.text(appSettings.schoolName, 25, finalY + 11);
 
@@ -1522,7 +1441,6 @@ async function saveAttendanceData() {
             doc.setFont('helvetica', 'normal');
             doc.text(`NIP. ${appSettings.principalNip || '------------------------'}`, 25, finalY + 37);
 
-            // Right Side: Kepala Perpustakaan
             doc.text("Kepala Perpustakaan", 145, finalY + 6);
             doc.text(appSettings.libName, 145, finalY + 11);
 
@@ -1540,13 +1458,6 @@ async function saveAttendanceData() {
                     printWindow.onload = function() {
                         printWindow.print();
                     };
-                } else {
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = blobUrl;
-                    document.body.appendChild(iframe);
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
                 }
                 showToast('Membuka dialog pencetakan printer...', 'info');
             } else {
@@ -1610,7 +1521,6 @@ async function saveAttendanceData() {
                 .replace(/'/g, "&#039;");
         }
 
-        // Export Data (Backup) ke File JSON
         function exportBackupJSON() {
             const backupPayload = {
                 version: "2.0",
@@ -1630,7 +1540,6 @@ async function saveAttendanceData() {
             showToast('File backup data (.json) berhasil diunduh!', 'success');
         }
 
-        // Import Data dari File JSON
         function importBackupJSON(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1650,7 +1559,6 @@ async function saveAttendanceData() {
                                     saveSettings();
                                     applySettingsToUI();
                                 }
-                                saveAttendanceData();
                                 updateAllViews();
                                 showToast('Data dan pengaturan berhasil dipulihkan/diimpor!', 'success');
                             }
@@ -1663,79 +1571,82 @@ async function saveAttendanceData() {
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // Reset input
+            event.target.value = '';
         }
     </script>
-<script type="module">
-  // Fix: Gunakan URL CDN lengkap dengan versi SDK (misal: 10.8.0)
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // Konfigurasi Firebase Anda
-  const firebaseConfig = {
-    apiKey: "AIzaSyD2hwpCtn1nyVMysrEf0wfdyGGwkzL3mMg",
-    authDomain: "absensi-perpus-54202.firebaseapp.com",
-    projectId: "absensi-perpus-54202",
-    storageBucket: "absensi-perpus-54202.firebasestorage.app",
-    messagingSenderId: "932464497544",
-    appId: "1:932464497544:web:c605c4c7e8911a0710203d",
-    measurementId: "G-EKH6R2476K"
-  };
+    <!-- FIREBASE MODULE SDK SINGLE INITIALIZATION & REALTIME LISTENERS -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, doc, deleteDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // Inisialisasi Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+        // Konfigurasi Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyD2hwpCtn1nyVMysrEf0wfdyGGwkzL3mMg",
+            authDomain: "absensi-perpus-54202.firebaseapp.com",
+            projectId: "absensi-perpus-54202",
+            storageBucket: "absensi-perpus-54202.firebasestorage.app",
+            messagingSenderId: "932464497544",
+            appId: "1:932464497544:web:c605c4c7e8911a0710203d",
+            measurementId: "G-EKH6R2476K"
+        };
 
-  // Buat fungsi global agar bisa diakses oleh skrip HTML utama
-  window.simpanPresensiKeFirebaseGlobal = async function(dataPresensi) {
-    try {
-      await addDoc(collection(db, "presensi_perpustakaan"), {
-        waktuTanggal: dataPresensi.timestamp || new Date().toISOString(),
-        idVisitor: dataPresensi.visitorId,
-        namaLengkap: dataPresensi.name,
-        kategori: dataPresensi.category,
-        kelasUnit: dataPresensi.unit,
-        tujuanKunjungan: dataPresensi.purpose
-      });
-      console.log("Data berhasil terkirim ke Cloud Firebase!");
-    } catch (error) {
-      console.error("Gagal menyimpan ke Firebase:", error);
-    }
-  };
+        // Inisialisasi Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-  window.muatRiwayatDariFirebaseGlobal = async function() {
-    try {
-      const q = query(collection(db, "presensi_perpustakaan"), orderBy("waktuTanggal", "desc"));
-      const querySnapshot = await getDocs(q);
-      const dataDatabase = [];
-      
-      querySnapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        dataDatabase.push({
-          id: docSnap.id,
-          visitorId: d.idVisitor,
-          name: d.namaLengkap,
-          category: d.kategori,
-          unit: d.kelasUnit,
-          purpose: Array.isArray(d.tujuanKunjungan) ? d.tujuanKunjungan.join(', ') : d.tujuanKunjungan,
-          timestamp: d.waktuTanggal
+        // Fungsi Simpan Data ke Firestore
+        window.simpanPresensiKeFirebaseGlobal = async function(dataPresensi) {
+            try {
+                await addDoc(collection(db, "presensi_perpustakaan"), {
+                    waktuTanggal: dataPresensi.timestamp || new Date().toISOString(),
+                    idVisitor: dataPresensi.visitorId,
+                    namaLengkap: dataPresensi.name,
+                    kategori: dataPresensi.category,
+                    kelasUnit: dataPresensi.unit,
+                    tujuanKunjungan: dataPresensi.purpose
+                });
+                console.log("Data berhasil tersimpan ke Firebase!");
+            } catch (error) {
+                console.error("Gagal menyimpan ke Firebase:", error);
+                alert("Gagal menyimpan data ke Cloud Firebase: " + error.message);
+            }
+        };
+
+        // Fungsi Hapus Data dari Firestore
+        window.hapusDataFirebaseGlobal = async function(docId) {
+            try {
+                await deleteDoc(doc(db, "presensi_perpustakaan", docId));
+                console.log("Dokumen berhasil dihapus dari Firebase!");
+            } catch (error) {
+                console.error("Gagal menghapus dokumen Firebase:", error);
+            }
+        };
+
+        // Realtime Listener: Otomatis memperbarui tampilan setiap ada perubahan di database
+        const q = query(collection(db, "presensi_perpustakaan"), orderBy("waktuTanggal", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const dataDatabase = [];
+            snapshot.forEach((docSnap) => {
+                const d = docSnap.data();
+                dataDatabase.push({
+                    id: docSnap.id,
+                    visitorId: d.idVisitor || '',
+                    name: d.namaLengkap || '',
+                    category: d.kategori || 'Siswa',
+                    unit: d.kelasUnit || '',
+                    purpose: Array.isArray(d.tujuanKunjungan) ? d.tujuanKunjungan.join(', ') : (d.tujuanKunjungan || ''),
+                    timestamp: d.waktuTanggal || new Date().toISOString()
+                });
+            });
+
+            window.attendanceList = dataDatabase;
+            if (typeof updateAllViews === "function") {
+                updateAllViews();
+            }
+        }, (error) => {
+            console.error("Error Realtime Firebase:", error);
         });
-      });
-
-      if (dataDatabase.length > 0) {
-        window.attendanceList = dataDatabase;
-        if (typeof renderTable === "function") renderTable();
-        if (typeof updateAllViews === "function") updateAllViews();
-      }
-    } catch (error) {
-      console.error("Gagal mengambil data dari Firebase:", error);
-    }
-  };
-
-  // Panggil muat data otomatis saat halaman selesai dimuat
-  window.addEventListener('DOMContentLoaded', () => {
-    window.muatRiwayatDariFirebaseGlobal();
-  });
-</script>
+    </script>
 </body>
 </html>
