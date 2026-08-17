@@ -1667,14 +1667,14 @@ async function saveAttendanceData() {
         }
     </script>
 <script type="module">
-  // 1. Mengimpor pustaka Firebase Firestore resmi
-  import { initializeApp } from "https://gstatic.com";
-  import { getFirestore, collection, addDoc, getDocs, orderBy, query } from "https://gstatic.com";
+  // Fix: Gunakan URL CDN lengkap dengan versi SDK (misal: 10.8.0)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // 2. Menggunakan Konfigurasi Firebase Asli Milik Anda
+  // Konfigurasi Firebase Anda
   const firebaseConfig = {
     apiKey: "AIzaSyD2hwpCtn1nyVMysrEf0wfdyGGwkzL3mMg",
-    authDomain: "://firebaseapp.com",
+    authDomain: "absensi-perpus-54202.firebaseapp.com",
     projectId: "absensi-perpus-54202",
     storageBucket: "absensi-perpus-54202.firebasestorage.app",
     messagingSenderId: "932464497544",
@@ -1682,93 +1682,59 @@ async function saveAttendanceData() {
     measurementId: "G-EKH6R2476K"
   };
 
-  // Inisialisasi koneksi database
+  // Inisialisasi Firebase
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // 3. FUNGSI SIMPAN DATA KE CLOUD FIREBASE
-  async function simpanPresensiKeFirebase() {
-    // AMBIL DATA DARI FORM (Sesuaikan ID di dalam kurung jika berbeda dengan HTML Anda)
-    const idVisitor = document.getElementById('input-id-visitor')?.value || "";
-    const namaLengkap = document.getElementById('input-nama')?.value || "";
-    const kategori = document.querySelector('input[name="kategori"]:checked')?.value || "";
-    const kelasUnit = document.getElementById('select-kelas')?.value || "";
-    
-    // Mengambil pilihan tujuan kunjungan
-    const tujuanArray = [];
-    document.querySelectorAll('input[name="tujuan"]:checked').forEach((checkbox) => {
-      tujuanArray.push(checkbox.value);
-    });
-
-    if (!idVisitor || !namaLengkap || !kategori) {
-      alert("Mohon lengkapi ID, Nama Lengkap, dan Kategori Pengunjung!");
-      return;
-    }
-
+  // Buat fungsi global agar bisa diakses oleh skrip HTML utama
+  window.simpanPresensiKeFirebaseGlobal = async function(dataPresensi) {
     try {
-      // Mengirimkan objek data langsung ke server cloud Firebase
       await addDoc(collection(db, "presensi_perpustakaan"), {
-        waktuTanggal: new Date().toISOString(),
-        idVisitor: idVisitor,
-        namaLengkap: namaLengkap,
-        kategori: kategori,
-        kelasUnit: kelasUnit,
-        tujuanKunjungan: tujuanArray
+        waktuTanggal: dataPresensi.timestamp || new Date().toISOString(),
+        idVisitor: dataPresensi.visitorId,
+        namaLengkap: dataPresensi.name,
+        kategori: dataPresensi.category,
+        kelasUnit: dataPresensi.unit,
+        tujuanKunjungan: dataPresensi.purpose
       });
-
-      alert("Data kunjungan berhasil tersimpan di Cloud Firebase!");
-      muatUlangTabelDariFirebase(); // Memperbarui baris tabel secara otomatis
-      document.getElementById('form-presensi')?.reset(); // Mengosongkan form kembali
+      console.log("Data berhasil terkirim ke Cloud Firebase!");
     } catch (error) {
-      console.error("Gagal menyimpan data:", error);
-      alert("Gagal terhubung ke database cloud! Periksa koneksi internet.");
+      console.error("Gagal menyimpan ke Firebase:", error);
     }
-  }
+  };
 
-  // 4. FUNGSI MEMBACA DATA DARI SERVER KE TABEL HTML
-  async function muatUlangTabelDariFirebase() {
-    const tabelBody = document.getElementById('tabel-riwayat-body'); // Sesuaikan dengan ID <tbody> tabel Anda
-    if (!tabelBody) return;
-
+  window.muatRiwayatDariFirebaseGlobal = async function() {
     try {
       const q = query(collection(db, "presensi_perpustakaan"), orderBy("waktuTanggal", "desc"));
       const querySnapshot = await getDocs(q);
+      const dataDatabase = [];
       
-      tabelBody.innerHTML = ""; 
-      let nomor = 1;
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const dateObj = new Date(data.waktuTanggal);
-        const formatWaktu = dateObj.toLocaleDateString('id-ID') + " " + dateObj.toLocaleTimeString('id-ID') + " WIB";
-
-        const barisHtml = `
-          <tr>
-            <td>${nomor++}</td>
-            <td>${formatWaktu}</td>
-            <td>${data.idVisitor}</td>
-            <td>${data.namaLengkap}</td>
-            <td>${data.kategori}</td>
-            <td>${data.kelasUnit || '-'}</td>
-            <td>${data.tujuanKunjungan.join(', ')}</td>
-          </tr>
-        `;
-        tabelBody.insertAdjacentHTML('beforeend', barisHtml);
+      querySnapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        dataDatabase.push({
+          id: docSnap.id,
+          visitorId: d.idVisitor,
+          name: d.namaLengkap,
+          category: d.kategori,
+          unit: d.kelasUnit,
+          purpose: Array.isArray(d.tujuanKunjungan) ? d.tujuanKunjungan.join(', ') : d.tujuanKunjungan,
+          timestamp: d.waktuTanggal
+        });
       });
+
+      if (dataDatabase.length > 0) {
+        window.attendanceList = dataDatabase;
+        if (typeof renderTable === "function") renderTable();
+        if (typeof updateAllViews === "function") updateAllViews();
+      }
     } catch (error) {
-      console.error("Gagal memuat tabel:", error);
+      console.error("Gagal mengambil data dari Firebase:", error);
     }
-  }
+  };
 
-  // 5. MENGHUBUNGKAN TOMBOL SIMPAN FORM DENGAN FIREBASE
-  document.getElementById('btn-simpan-kehadiran')?.addEventListener('click', function(e) {
-    e.preventDefault();
-    simpanPresensiKeFirebase();
-  });
-
-  // Jalankan penarikan data riwayat otomatis saat halaman web dibuka pertama kali
+  // Panggil muat data otomatis saat halaman selesai dimuat
   window.addEventListener('DOMContentLoaded', () => {
-    muatUlangTabelDariFirebase();
+    window.muatRiwayatDariFirebaseGlobal();
   });
 </script>
 </body>
